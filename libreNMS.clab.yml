@@ -1,0 +1,159 @@
+name: libreNMS
+
+topology:
+  defaults:
+    env:
+      PUID: 1000 # LibreNMS user id (default 1000)
+      PGID: 1000 # LibreNMS group id (default 1000)
+      DB_HOST: clab-libreNMS-db #clab created hostname
+      DB_PORT: 3306
+      DB_NAME: librenms #default
+      DB_USER: librenms #default
+      DB_PASSWORD: librenms #default
+      DB_TIMEOUT: 60
+      MYSQL_DATABASE: librenms #default
+      MYSQL_USER: librenms #default
+      MYSQL_PASSWORD: librenms #default
+      TZ: Europe/Brussels
+  nodes:
+    db:
+      kind: linux
+      image: mariadb:10.5
+      cmd: mysqld --innodb-file-per-table=1 --lower-case-table-names=0 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      binds:
+        - ./db:/var/lib/mysql
+      env:
+        MYSQL_ALLOW_EMPTY_PASSWORD: yes
+    redis:
+      kind: linux
+      image: redis:5.0-alpine
+    msmtpd:
+      kind: linux
+      image: crazymax/msmtpd:latest
+      env:
+        SMTP_HOST: smtp.gmail.com
+        SMTP_PORT: 587
+        SMTP_TLS: on
+        SMTP_STARTTLS: on
+        SMTP_TLS_CHECKCERT: on
+        SMTP_AUTH: on
+        SMTP_USER: foo
+        SMTP_PASSWORD: bar
+        SMTP_FROM: foo@gmail.com
+    librenms:
+      kind: linux
+      image: librenms/librenms:latest
+      ports:
+        - 8000:8000/tcp
+      wait-for:
+        - db
+        - redis
+        - msmtpd
+#      depends_on:
+#        - db
+#        - redis
+#        - msmtpd
+      binds:
+        - ./librenms:/data
+      env:
+        DB_TIMEOUT: 60
+        MEMORY_LIMIT: 256M
+        MAX_INPUT_VARS: 1000
+        UPLOAD_MAX_SIZE: 16M
+        OPCACHE_MEM_SIZE: 128
+        REAL_IP_FROM: 0.0.0.0/32
+        REAL_IP_HEADER: X-Forwarded-For
+        LOG_IP_VAR: remote_addr
+        CACHE_DRIVER: redis
+        SESSION_DRIVER: redis
+        REDIS_HOST: clab-libreNMS-redis
+        LIBRENMS_SNMP_COMMUNITY: librenmsdocker
+        LIBRENMS_WEATHERMAP: false
+        LIBRENMS_WEATHERMAP_SCHEDULE: "*/5 * * * *"
+    dispatcher:
+      kind: linux
+      image: librenms/librenms:latest
+      wait-for:
+        - librenms
+        - redis
+#      depends_on:
+#        - librennms
+#        - redis
+      binds:
+        - ./librenms:/data
+      env:
+        DISPATCHER_NODE_ID: dispatcher1
+        SIDECAR_DISPATCHER: 1
+        MEMORY_LIMIT: 256M
+        MAX_INPUT_VARS: 1000
+        UPLOAD_MAX_SIZE: 16M
+        OPCACHE_MEM_SIZE: 128
+        REAL_IP_FROM: 0.0.0.0/32
+        REAL_IP_HEADER: X-Forwarded-For
+        LOG_IP_VAR: remote_addr
+        CACHE_DRIVER: redis
+        SESSION_DRIVER: redis
+        REDIS_HOST: clab-libreNMS-redis
+        LIBRENMS_SNMP_COMMUNITY: librenmsdocker
+        LIBRENMS_WEATHERMAP: false
+        LIBRENMS_WEATHERMAP_SCHEDULE: "*/5 * * * *"
+    syslogng:
+      kind: linux
+      image: librenms/librenms:latest
+      wait-for:
+        - librenms
+        - redis
+#      depends_on:
+#        - librennms
+#        - redis
+      ports:
+        - 514:514/tcp
+        - 514:514/udp
+      binds:
+        - librenms:/data
+      env:
+        SIDECAR_SYSLOGNG: 1
+        MEMORY_LIMIT: 256M
+        MAX_INPUT_VARS: 1000
+        UPLOAD_MAX_SIZE: 16M
+        OPCACHE_MEM_SIZE: 128
+        REAL_IP_FROM: 0.0.0.0/32
+        REAL_IP_HEADER: X-Forwarded-For
+        LOG_IP_VAR: remote_addr
+        CACHE_DRIVER: redis
+        SESSION_DRIVER: redis
+        REDIS_HOST: clab-libreNMS-redis
+        LIBRENMS_SNMP_COMMUNITY: librenmsdocker
+        LIBRENMS_WEATHERMAP: false
+        LIBRENMS_WEATHERMAP_SCHEDULE: "*/5 * * * *"
+    snmptrapd:
+      kind: linux
+      image: librenms/librenms:latest
+      wait-for:
+        - librenms
+        - redis
+#      depends_on:
+#        - librennms
+#        - redis
+      ports:
+        - 162:162/udp
+        - 162:162/tcp
+      binds:
+        - librenms:/data
+      env:
+        SIDECAR_SNMPTRAPD: 1
+        MEMORY_LIMIT: 256M
+        MAX_INPUT_VARS: 1000
+        UPLOAD_MAX_SIZE: 16M
+        OPCACHE_MEM_SIZE: 128
+        REAL_IP_FROM: 0.0.0.0/32
+        REAL_IP_HEADER: X-Forwarded-For
+        LOG_IP_VAR: remote_addr
+        CACHE_DRIVER: redis
+        SESSION_DRIVER: redis
+        REDIS_HOST: clab-libreNMS-redis
+        LIBRENMS_SNMP_COMMUNITY: librenmsdocker
+        LIBRENMS_WEATHERMAP: false
+        LIBRENMS_WEATHERMAP_SCHEDULE: "*/5 * * * *"
+
+
